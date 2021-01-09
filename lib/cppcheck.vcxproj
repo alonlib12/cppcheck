@@ -59,6 +59,7 @@
     <ClCompile Include="checkclass.cpp" />
     <ClCompile Include="checkcondition.cpp" />
     <ClCompile Include="checkfunctions.cpp" />
+    <ClCompile Include="checkselfassignment.cpp" />
     <ClCompile Include="checkstring.cpp" />
     <ClCompile Include="checkexceptionsafety.cpp" />
     <ClCompile Include="checkinternal.cpp" />
@@ -119,6 +120,7 @@
     <ClInclude Include="checkclass.h" />
     <ClInclude Include="checkcondition.h" />
     <ClInclude Include="checkfunctions.h" />
+    <ClInclude Include="checkselfassignment.h" />
     <ClInclude Include="checkstring.h" />
     <ClInclude Include="checkexceptionsafety.h" />
     <ClInclude Include="checkinternal.h" />
