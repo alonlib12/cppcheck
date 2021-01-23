@@ -1480,7 +1480,7 @@ void CheckClass::operatorEqMissingReturnStatementError(const Token *tok, bool er
 // assignment to self.
 //---------------------------------------------------------------------------
 
-void CheckClass::operatorEqToSelf()
+void CheckClass::operatorEqToSelf() //
 {
     if (!mSettings->isEnabled(Settings::WARNING))
         return;
