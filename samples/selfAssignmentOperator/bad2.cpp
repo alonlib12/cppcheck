@@ -12,12 +12,9 @@ Bug::~Bug()
 
 Bug& Bug::operator=(const Bug& rhs)
 {
-	if (this == &rhs) // Oh no, inverse condition
-	{
-		length = rhs.length;
-		delete[] array;
-		array = new int[length];
-		std::copy_n(rhs.array, length, array);
-	}
+	length = rhs.length;
+	delete[] array;
+	array = new int[length];
+	std::copy_n(rhs.array, length, array);
 	return *this;
 }

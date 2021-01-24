@@ -1480,7 +1480,7 @@ void CheckClass::operatorEqMissingReturnStatementError(const Token *tok, bool er
 // assignment to self.
 //---------------------------------------------------------------------------
 
-void CheckClass::operatorEqToSelf() //
+void CheckClass::operatorEqToSelf()
 {
     if (!mSettings->isEnabled(Settings::WARNING))
         return;
@@ -1505,10 +1505,25 @@ void CheckClass::operatorEqToSelf() //
                 if (Token::Match(func.retDef, "%type% &") && func.retDef->str() == scope->className) {
                     // find the parameter name
                     const Token *rhs = func.argumentList.begin()->nameToken();
-
-                    if (!hasAssignSelf(&func, rhs)) {
+                    const Token* out_ifScopeStart = nullptr;
+                    if (!hasAssignSelf(&func, rhs, &out_ifScopeStart)) {
                         if (hasAllocation(&func, scope))
                             operatorEqToSelfError(func.token);
+                    }
+                    if (out_ifScopeStart != nullptr) {
+                    	const Token *end;
+                    	if (out_ifScopeStart->str() == "{")
+                    		end = out_ifScopeStart->link();
+                    	else if (out_ifScopeStart->str() == "}" || out_ifScopeStart->str() == ";") {
+                    		end = func.functionScope->bodyEnd;
+                    	}
+                    	else {
+                    		const Token* itr;
+                    		for (itr = out_ifScopeStart; itr && itr->str()!=";"; itr=itr->next()) {}
+                    		end = itr;
+                    	}
+                    	if (hasAllocation(&func, scope, out_ifScopeStart, end))
+                    		operatorEqToSelfError(func.token);
                     }
                 }
             }
@@ -1518,14 +1533,18 @@ void CheckClass::operatorEqToSelf() //
 
 bool CheckClass::hasAllocation(const Function *func, const Scope* scope) const
 {
+	return hasAllocation(func, scope, func->functionScope->bodyStart, func->functionScope->bodyEnd);
+}
+
+bool CheckClass::hasAllocation(const Function *func, const Scope* scope, const Token *start, const Token *end) const
+{
     // This function is called when no simple check was found for assignment
     // to self.  We are currently looking for:
     //    - deallocate member ; ... member =
     //    - alloc member
     // That is not ideal because it can cause false negatives but its currently
     // necessary to prevent false positives.
-    const Token *last = func->functionScope->bodyEnd;
-    for (const Token *tok = func->functionScope->bodyStart; tok && (tok != last); tok = tok->next()) {
+    for (const Token *tok = start; tok && (tok != end); tok = tok->next()) {
         if (Token::Match(tok, "%var% = malloc|realloc|calloc|new") && isMemberVar(scope, tok))
             return true;
 
@@ -1541,7 +1560,7 @@ bool CheckClass::hasAllocation(const Function *func, const Scope* scope) const
             continue;
         // Check for assignment to the deleted pointer (only if its a member of the class)
         if (isMemberVar(scope, var)) {
-            for (const Token *tok1 = var->next(); tok1 && (tok1 != last); tok1 = tok1->next()) {
+            for (const Token *tok1 = var->next(); tok1 && (tok1 != end); tok1 = tok1->next()) {
                 if (Token::Match(tok1, "%varid% =", var->varId()))
                     return true;
             }
@@ -1550,8 +1569,27 @@ bool CheckClass::hasAllocation(const Function *func, const Scope* scope) const
 
     return false;
 }
+bool CheckClass::isInverseAssignmentTest(const Token *tok)
+{
+	bool res = true;
+	for (const Token *itr = tok; itr; itr=itr->astParent()) {
+		if (itr->str() == "!=" && (itr->astOperand1()->str() == "true" || itr->astOperand2()->str() == "true")) {
+			res = !res;
+		}
+		else if (itr->str() == "!=" && !itr->astOperand1()->isBoolean()) {
+			res = !res;
+		}
+		else if (itr->str() == "!") {
+			res = !res;
+		}
+		else if (itr->str() == "==" && (itr->astOperand1()->str() == "false" || itr->astOperand2()->str() == "false")) {
+			res = !res;
+		}
+	}
+	return res;
+}
 
-bool CheckClass::hasAssignSelf(const Function *func, const Token *rhs)
+bool CheckClass::hasAssignSelf(const Function *func, const Token *rhs, const Token **out_scopeStart)
 {
     if (!rhs)
         return false;
@@ -1573,6 +1611,23 @@ bool CheckClass::hasAssignSelf(const Function *func, const Token *rhs)
                 return ChildrenToVisit::op1_and_op2;
             if (tok2 && tok2->isUnaryOp("&") && tok2->astOperand1()->str() == rhs->str())
                 ret = true;
+            if (ret) {
+            	const Token *itr;
+            	if (isInverseAssignmentTest(tok2)) {
+            		for (itr = tok2; itr->astParent(); itr=itr->astParent()){}
+            		if (itr->str() == "(" && itr->link()->next())
+            			*out_scopeStart = itr->link()->next();
+            	}
+            	else {
+            		for (itr = tok2; itr->astParent(); itr=itr->astParent()){}
+					if (itr->str() == "(" && itr->link()->next() && itr->link()->next()->str() == "}")
+						*out_scopeStart = itr->link()->next();
+					else {
+						for (; itr && itr->str()!=";"; itr=itr->next()) {}
+						*out_scopeStart = itr;
+					}
+            	}
+            }
             return ret ? ChildrenToVisit::done : ChildrenToVisit::op1_and_op2;
         });
         if (ret)
