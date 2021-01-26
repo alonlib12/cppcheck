@@ -117,3 +117,7 @@ compile_commands.json
 
 # qmake
 /gui/.qmake.stash
+
+.cproject
+.project
+.settings/
